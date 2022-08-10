@@ -163,7 +163,7 @@ cc_library_static {
         "libcrypto",
     ],
     whole_static_libs: [
-        "PlatformProperties",
+        "libPlatformProperties",
         "libbt-audio-hal-interface-qti",
         "libbt-common-qti",
         //"libbtif_ext",
