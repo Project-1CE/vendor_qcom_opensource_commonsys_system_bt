@@ -2508,6 +2508,7 @@ static void btm_ble_appearance_to_cod(uint16_t appearance, uint8_t* dev_class) {
   };
 }
 
+#ifdef ADV_AUDIO_FEATURE
 bool parse_adv_audio_uuids_from_adv_pkt (const uint8_t* ad, size_t ad_len,
     uint8_t type) {
   size_t position = 0;
@@ -2535,6 +2536,8 @@ bool parse_adv_audio_uuids_from_adv_pkt (const uint8_t* ad, size_t ad_len,
   }
   return false;
 }
+#endif
+
 /**
  * Update adv packet information into inquiry result.
  */
