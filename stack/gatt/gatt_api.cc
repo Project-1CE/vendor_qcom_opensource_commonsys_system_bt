@@ -35,6 +35,7 @@
 #include "stack/gatt/connection_manager.h"
 #include "stack/gatt/eatt_int.h"
 #include "btif_storage.h"
+#include "stack_config.h"
 
 #define SYSTEM_APP_GATT_IF 3
 
@@ -155,6 +156,26 @@ static void gatt_update_for_database_change() {
     if (tcb.in_use) gatt_sr_update_cl_status(tcb, /* chg_aware= */ false);
   }
 }
+
+static bool is_uuid_le_only_transport(Uuid uuid) {
+  uint16_t uuid_val = uuid.As16Bit();
+  bool status = false;
+
+  switch (uuid_val) {
+    case 0x1849:
+      FALLTHROUGH_INTENDED; /* FALLTHROUGH */
+    case 0x184C:
+      {
+        status = true;
+        APPL_TRACE_DEBUG("%s: Only LE Transport 0x%X ", __func__, uuid.As16Bit());
+      }
+      break;
+    default:
+      APPL_TRACE_DEBUG("%s: 0x%X, 0x%X ", __func__, uuid.As16Bit(), uuid_val);
+  }
+  return status;
+}
+
 
 /*******************************************************************************
  *
@@ -318,8 +339,10 @@ uint16_t GATTS_AddService(tGATT_IF gatt_if, btgatt_db_element_t* service,
 
   if (elem.type == GATT_UUID_PRI_SERVICE) {
     Uuid* p_uuid = gatts_get_service_uuid(elem.p_db);
-    if (p_uuid) {
+    if (p_uuid && !is_uuid_le_only_transport(*p_uuid)) {
       elem.sdp_handle = gatt_add_sdp_record(*p_uuid, elem.s_hdl, elem.e_hdl);
+    } else {
+      elem.sdp_handle = 0;
     }
   } else {
     elem.sdp_handle = 0;
@@ -332,7 +355,9 @@ uint16_t GATTS_AddService(tGATT_IF gatt_if, btgatt_db_element_t* service,
           << ", sdp_hdl=" << loghex(elem.sdp_handle);
 
   gatt_update_for_database_change();
-  gatt_proc_srv_chg();
+  if (!stack_config_get_interface()->get_pts_service_chg_indication_disable()) {
+    gatt_proc_srv_chg();
+  }
 
   return GATT_SERVICE_STARTED;
 }
@@ -387,7 +412,9 @@ bool GATTS_DeleteService(tGATT_IF gatt_if, Uuid* p_svc_uuid,
   }
 
   gatt_update_for_database_change();
-  gatt_proc_srv_chg();
+  if (!stack_config_get_interface()->get_pts_service_chg_indication_disable()) {
+    gatt_proc_srv_chg();
+  }
 
   VLOG(1) << "released handles s_hdl=" << loghex(it->asgn_range.s_handle)
           << ", e_hdl=" << loghex(it->asgn_range.e_handle);

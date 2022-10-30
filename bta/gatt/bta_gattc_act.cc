@@ -857,9 +857,19 @@ void bta_gattc_start_discover(tBTA_GATTC_CLCB* p_clcb,
       p_clcb->p_srcb->update_count = 0;
       p_clcb->p_srcb->state = BTA_GATTC_SERV_DISC_ACT;
 
+      uint16_t manufacturer = 0;
+      uint16_t lmp_sub_version = 0;
+      uint8_t lmp_version = 0;
+
+      BTM_ReadRemoteVersionByTransport(p_clcb->bda, &lmp_version,
+          &manufacturer, &lmp_sub_version, BTA_TRANSPORT_LE);
+      VLOG(1) << __func__ << ": lmp_version" << +lmp_version
+              << ": lmp_sub_version" << +lmp_sub_version;
+
       /* read db hash if db hash characteristic exists */
       if (bta_gattc_is_robust_caching_enabled() &&
           p_clcb->p_srcb->srvc_hdl_db_hash &&
+          (lmp_version >= HCI_PROTO_VERSION_5_1) &&
           bta_gattc_read_db_hash(p_clcb, is_svc_chg)) {
         LOG(INFO) << __func__
                   << ": pending service discovery, read db hash first";
@@ -886,7 +896,8 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
                          UNUSED_ATTR tBTA_GATTC_DATA* p_data) {
   tBTA_GATTC_DATA* p_q_cmd = p_clcb->p_q_cmd;
 
-  VLOG(1) << __func__ << ": conn_id=" << loghex(p_clcb->bta_conn_id);
+  VLOG(1) << __func__ << ": conn_id=" << loghex(p_clcb->bta_conn_id)
+                      << ", status = " << +p_clcb->status;
 
   if (p_clcb->transport == BTA_TRANSPORT_LE) {
     if (p_clcb->p_srcb &&
@@ -907,6 +918,12 @@ void bta_gattc_disc_cmpl(tBTA_GATTC_CLCB* p_clcb,
       p_clcb->p_srcb->gatt_database.Clear();
       /* used to reset cache in application */
       bta_gattc_cache_reset(p_clcb->p_srcb->server_bda);
+    }
+    uint16_t p_conn_id;
+    if (!GATT_GetConnIdIfConnected((uint8_t)p_clcb->bta_conn_id, p_clcb->bda,
+                                  &p_conn_id, p_clcb->transport)) {
+      osi_free_and_reset((void**)&p_q_cmd);
+      p_clcb->p_q_cmd = NULL;
     }
   }
 
