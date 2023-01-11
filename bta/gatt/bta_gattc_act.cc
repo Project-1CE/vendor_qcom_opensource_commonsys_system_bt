@@ -76,6 +76,7 @@
 #include "device/include/interop.h"
 #include "stack/btm/btm_int_types.h"
 #include "btif/include/btif_storage.h"
+#include "btm_int.h"
 
 #if (BTA_HH_LE_INCLUDED == TRUE)
 #include "bta_hh_int.h"
@@ -334,12 +335,26 @@ void bta_gattc_process_api_open(tBTA_GATTC_DATA* p_msg) {
     RawAddress map_addr = btif_get_map_address(bd_addr);
     if (map_addr != RawAddress::kEmpty) {
       //Checking whether ACL connection is UP or not?
-      LOG(INFO) << __func__ << " Valid Mapaddr ";
+      LOG(INFO) << __func__ << " Valid Mapaddr " <<map_addr;
       tACL_CONN* p_acl = btm_bda_to_acl(map_addr, BT_TRANSPORT_LE);
       if (p_acl != NULL) {
         tBTA_GATTC_CLCB* p_clcb =
           bta_gattc_cl_get_regcb_by_bdaddr(map_addr, BT_TRANSPORT_LE);
         if (p_clcb != NULL) {
+          dev_addr_map[p_msg->api_conn.client_if] = bd_addr;
+          p_msg->api_conn.remote_bda = map_addr;
+        }
+      } else {
+        tBT_DEVICE_TYPE dev_type;
+        tBLE_ADDR_TYPE addr_type;
+
+        BTM_ReadDevInfo(bd_addr, &dev_type, &addr_type);
+        bool addr_is_rpa = (addr_type == BLE_ADDR_RANDOM && BTM_BLE_IS_RESOLVE_BDA(bd_addr));
+        LOG(INFO) << __func__ << " -- addr_is_rpa " << addr_is_rpa;
+        if (addr_is_rpa) {
+          dev_addr_map[p_msg->api_conn.client_if] = bd_addr;
+          p_msg->api_conn.remote_bda = map_addr;
+        } else if (!is_remote_support_adv_audio(map_addr)) {
           dev_addr_map[p_msg->api_conn.client_if] = bd_addr;
           p_msg->api_conn.remote_bda = map_addr;
         }
@@ -597,12 +612,9 @@ void bta_gattc_conn(tBTA_GATTC_CLCB* p_clcb, tBTA_GATTC_DATA* p_data) {
       p_clcb->p_srcb->state != BTA_GATTC_SERV_IDLE) {
     if (p_clcb->p_srcb->state == BTA_GATTC_SERV_IDLE) {
       p_clcb->p_srcb->state = BTA_GATTC_SERV_LOAD;
-      // Consider the case that if GATT Server is changed, but no service
-      // changed indication is received, the database might be out of date. So
-      // if robust caching is enabled, any time when connection is established,
-      // always check the db hash first, not just load the stored database.
+      // For bonded devices, read cache directly, and back to connected state.
       gatt::Database db = bta_gattc_cache_load(p_clcb->p_srcb->server_bda);
-      if (!bta_gattc_is_robust_caching_enabled() && !db.IsEmpty()) {
+      if (!db.IsEmpty() && btm_sec_is_a_bonded_dev(p_clcb->p_srcb->server_bda)) {
         p_clcb->p_srcb->gatt_database = db;
         p_clcb->p_srcb->state = BTA_GATTC_SERV_IDLE;
         bta_gattc_reset_discover_st(p_clcb->p_srcb, GATT_SUCCESS);
