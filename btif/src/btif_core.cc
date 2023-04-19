@@ -67,7 +67,6 @@
 #include "stack_manager.h"
 #include "device/include/device_iot_config.h"
 
-#include "btif_ahim.h"
 using bluetooth::Uuid;
 /*******************************************************************************
  *  Constants & Macros
@@ -1449,9 +1448,4 @@ bt_status_t btif_set_dynamic_audio_buffer_size(int codec, int size) {
   }
 
   return BT_STATUS_SUCCESS;
-}
-
-void btif_update_params(uint16_t delay, uint8_t mode) {
-  BTIF_TRACE_DEBUG("%s", __func__);
-  btif_ahim_update_params(delay, mode);
 }
