@@ -51,6 +51,8 @@
 #include "bta/dm/bta_dm_int.h"
 #include "stack_config.h"
 
+#include "device/include/interop.h"
+
 #define BTM_SEC_MAX_COLLISION_DELAY (5000)
 
 #ifdef APPL_AUTH_WRITE_EXCEPTION
@@ -4018,6 +4020,7 @@ static bool btm_sec_auth_retry(uint16_t handle, uint8_t status) {
        Legacy device do not need this. the controller will drive the retry
        automatically
        set the retry bit */
+    btif_storage_remove_bonded_device(&p_dev_rec->bd_addr);
     btm_cb.collision_start_time = 0;
     btm_restore_mode();
     p_dev_rec->sm4 |= BTM_SM4_RETRY;
@@ -4341,7 +4344,7 @@ void btm_sec_encrypt_change(uint16_t handle, uint8_t status,
 
         if (p_dev_rec->no_smp_on_br) {
           BTM_TRACE_DEBUG("%s NO SM over BR/EDR", __func__);
-        } else {
+        } else if(!interop_match_addr_or_name(INTEROP_DISABLE_OUTGOING_BR_SMP, &p_dev_rec->bd_addr)) {
           BTM_TRACE_DEBUG("%s start SM over BR/EDR", __func__);
           SMP_BR_PairWith(p_dev_rec->bd_addr);
         }
